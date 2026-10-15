@@ -7,7 +7,12 @@ from flask import Flask, redirect, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = "mi-clave-secreta-test-vocacional-2024"
+
+app.secret_key = "clave-secreta-test-vocacional"
+
+# =========================================================
+# CONFIGURACIÓN MYSQL (Adaptada para entorno local / XAMPP)
+# =========================================================
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     "mysql+pymysql://root:@localhost:3306/test_vocacional2"
 )
@@ -15,8 +20,27 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
+# =========================================================
+# TEMAS POR ÁREA
+# =========================================================
+AREA_TEMAS = {
+    1: {"icono": "💻", "c1": "#6366f1", "c2": "#8b5cf6"},
+    2: {"icono": "🍎", "c1": "#10b981", "c2": "#34d399"},
+    3: {"icono": "🚗", "c1": "#f59e0b", "c2": "#f97316"},
+    4: {"icono": "⚡", "c1": "#ec4899", "c2": "#a855f7"},
+}
 
-# ===== MODELOS =====
+
+def tema_area(area_id):
+    return AREA_TEMAS.get(
+        area_id,
+        {"icono": "🎯", "c1": "#2563eb", "c2": "#3b82f6"},
+    )
+
+
+# =========================================================
+# MODELOS
+# =========================================================
 class AreaVocacional(db.Model):
     __tablename__ = "areas_vocacionales"
     id = db.Column(db.Integer, primary_key=True)
@@ -30,123 +54,538 @@ class Carrera(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
-    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"), nullable=False)
+    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"))
 
 
 class Pregunta(db.Model):
     __tablename__ = "preguntas"
     id = db.Column(db.Integer, primary_key=True)
     texto = db.Column(db.Text, nullable=False)
-    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"), nullable=False)
+    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"))
 
 
 class Usuario(db.Model):
     __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False)
-    edad = db.Column(db.Integer, nullable=False)
+    nombre = db.Column(db.String(100))
+    email = db.Column(db.String(100))
+    edad = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class Respuesta(db.Model):
     __tablename__ = "respuestas"
     id = db.Column(db.Integer, primary_key=True)
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    pregunta_id = db.Column(db.Integer, db.ForeignKey("preguntas.id"), nullable=False)
-    puntuacion = db.Column(db.Integer, nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+    pregunta_id = db.Column(db.Integer, db.ForeignKey("preguntas.id"))
+    puntuacion = db.Column(db.Integer)
 
 
 class Resultado(db.Model):
     __tablename__ = "resultados"
     id = db.Column(db.Integer, primary_key=True)
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"), nullable=False)
-    puntuacion_total = db.Column(db.Integer, nullable=False)
-    porcentaje = db.Column(db.Numeric(5, 2), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"))
+    area_id = db.Column(db.Integer, db.ForeignKey("areas_vocacionales.id"))
+    puntuacion_total = db.Column(db.Integer)
+    porcentaje = db.Column(db.Numeric(5, 2))
 
 
-# ===== RUTAS =====
+# =========================================================
+# ESTILOS
+# =========================================================
+def estilos():
+    return """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
+
+        :root {
+            --primary: #6366f1;
+            --primary-2: #8b5cf6;
+            --accent: #ec4899;
+            --secondary: #0f172a;
+            --success: #16a34a;
+            --background: #f4f7fb;
+            --card: rgba(255, 255, 255, .82);
+            --text: #172033;
+            --muted: #64748b;
+            --border: rgba(226, 232, 240, .9);
+            --shadow: rgba(79, 70, 229, .18);
+        }
+
+        body.dark {
+            --secondary: #f1f5f9;
+            --background: #070b1a;
+            --card: rgba(23, 30, 55, .78);
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --border: rgba(71, 85, 130, .5);
+            --shadow: rgba(0, 0, 0, .5);
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: 'Poppins', system-ui, sans-serif;
+            background: var(--background);
+            overflow-x: hidden;
+            transition: background .5s ease, color .4s ease;
+        }
+
+        /* ===== FONDO ANIMADO ===== */
+        .fondo {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            overflow: hidden;
+            background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 40%, #fdf2f8 100%);
+            transition: background .5s ease;
+        }
+
+        body.dark .fondo {
+            background: linear-gradient(135deg, #050816 0%, #0b1024 50%, #140b22 100%);
+        }
+
+        .orbe {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: .55;
+            animation: flotar 18s ease-in-out infinite;
+        }
+        .orbe.o1 { width: 420px; height: 420px; background: #6366f1; top: -120px; left: -100px; }
+        .orbe.o2 { width: 380px; height: 380px; background: #ec4899; bottom: -120px; right: -80px; animation-delay: -6s; }
+        .orbe.o3 { width: 320px; height: 320px; background: #10b981; top: 40%; left: 55%; animation-delay: -11s; }
+
+        @keyframes flotar {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(60px, -40px) scale(1.15); }
+            66% { transform: translate(-40px, 50px) scale(.9); }
+        }
+
+        .app-container {
+            width: min(calc(100% - 32px), 1050px);
+            margin: 0 auto;
+            padding: 24px 0 180px;
+            position: relative;
+        }
+
+        /* ===== BOTÓN TEMA ===== */
+        .tema-btn {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 500;
+            width: 50px;
+            height: 50px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            font-size: 1.35rem;
+            cursor: pointer;
+            box-shadow: 0 8px 24px var(--shadow);
+            transition: transform .3s ease, box-shadow .3s ease;
+        }
+        .tema-btn:hover {
+            transform: rotate(25deg) scale(1.12);
+            box-shadow: 0 12px 30px var(--shadow);
+        }
+
+        /* ===== LOGO ===== */
+        .logo-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+        .logo {
+            width: clamp(100px, 22vw, 150px);
+            height: clamp(100px, 22vw, 150px);
+            object-fit: contain;
+            border-radius: 24px;
+            background: #fff;
+            padding: 8px;
+            box-shadow: 0 12px 40px var(--shadow);
+        }
+
+        /* ===== TARJETAS Y FORMULARIOS ===== */
+        .card-custom {
+            background: var(--card);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: clamp(20px, 5vw, 40px);
+            box-shadow: 0 24px 60px var(--shadow);
+        }
+        .form-label { display: block; font-weight: 700; margin-bottom: 8px; font-size: .95rem; }
+        .form-control {
+            width: 100%;
+            min-height: 52px;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 12px 16px;
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            background: var(--card);
+            color: var(--text);
+            transition: border-color .25s ease, box-shadow .25s ease;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 5px rgba(99, 102, 241, .15);
+        }
+        .field { margin-bottom: 18px; }
+
+        .btn-main {
+            width: 100%;
+            min-height: 56px;
+            border: 0;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .25s ease, box-shadow .25s ease;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, .35);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-main:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(99, 102, 241, .55); color: #fff; }
+
+        .btn-secondary-custom {
+            width: 100%;
+            min-height: 50px;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            background: var(--card);
+            color: var(--text);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .25s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        .btn-secondary-custom:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* ===== OPCIONES Y PREGUNTAS ===== */
+        .question { font-size: clamp(1.2rem, 4vw, 1.5rem); font-weight: 800; margin-bottom: 22px; }
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            padding: 15px 18px;
+            margin-bottom: 12px;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            background: var(--card);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all .2s ease;
+        }
+        .option:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, .07);
+            transform: translateX(6px);
+        }
+        .option input { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+
+        /* ===== MASCOTA CAPIBARA ===== */
+        .mascota-caja {
+            position: fixed;
+            right: 24px;
+            bottom: 14px;
+            z-index: 400;
+            pointer-events: none;
+            user-select: none;
+            filter: drop-shadow(0 14px 26px rgba(0, 0, 0, .22));
+        }
+        .mascota-img {
+            width: 180px;
+            height: auto;
+            display: block;
+            animation: mascotaIdle 4s ease-in-out infinite;
+        }
+        @keyframes mascotaIdle {
+            0%, 100% { transform: translateY(0) rotate(-1.6deg); }
+            50% { transform: translateY(-10px) rotate(1.6deg); }
+        }
+        .capi-globo {
+            position: fixed;
+            right: 210px;
+            bottom: 140px;
+            background: #fff;
+            color: #1e293b;
+            padding: 10px 16px;
+            border-radius: 18px;
+            font-weight: 800;
+            font-size: .9rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 401;
+        }
+        body.dark .capi-globo { background: #1e293b; color: #e2e8f0; }
+
+        @media (max-width: 768px) {
+            .mascota-caja { right: 10px; bottom: 5px; }
+            .mascota-img { width: 110px; }
+            .capi-globo { right: 120px; bottom: 80px; font-size: .75rem; }
+        }
+    </style>
+    """
+
+
+# =========================================================
+# MASCOTA HTML
+# =========================================================
+def mascota_html():
+    return """
+    <div class="mascota-caja" id="capi">
+        <img src="/static/capibara.png" class="mascota-img" id="mascotaImg" alt="Mascota capibara" onerror="this.style.display='none'">
+    </div>
+    <div class="capi-globo" id="capiGlobo">¡Hola, a triunfar! 🦫</div>
+    """
+
+
+# =========================================================
+# SCRIPTS
+# =========================================================
+def scripts():
+    return """
+    <script>
+        (function () {
+            if (localStorage.getItem("tema") === "oscuro") {
+                document.body.classList.add("dark");
+            }
+        })();
+
+        function alternarTema() {
+            document.body.classList.toggle("dark");
+            const oscuro = document.body.classList.contains("dark");
+            localStorage.setItem("tema", oscuro ? "oscuro" : "claro");
+            const btn = document.getElementById("temaBtn");
+            if (btn) btn.textContent = oscuro ? "☀️" : "🌙";
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            const oscuro = document.body.classList.contains("dark");
+            const btn = document.getElementById("temaBtn");
+            if (btn) btn.textContent = oscuro ? "☀️" : "🌙";
+        });
+    </script>
+    """
+
+
+# =========================================================
+# RUTAS DE LA APLICACIÓN
+# =========================================================
 @app.route("/")
 def index():
-    return """
+    return f"""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Test Vocacional - Instituto</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-                min-height: 100vh;
-                font-family: 'Segoe UI', Roboto, sans-serif;
-            }
-            .logo-container { text-align: center; margin-bottom: 20px; }
-            .logo { max-width: 200px; height: auto; }
-            .card {
-                background: #ffffff;
-                border-radius: 20px;
-                box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-                overflow: hidden;
-            }
-            .form-label { font-weight: 600; color: #2c3e50; }
-            .form-control {
-                border-radius: 12px;
-                border: 2px solid #e0e6ed;
-                padding: 10px 15px;
-                transition: all 0.3s ease;
-            }
-            .form-control:focus {
-                border-color: #007bff;
-                box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
-            }
-            .btn-custom {
-                background: linear-gradient(90deg, #ff6b35, #f7931e);
-                color: white;
-                font-weight: 600;
-                border-radius: 12px;
-                padding: 12px;
-                border: none;
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }
-            .btn-custom:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 20px rgba(255,107,53,0.35);
-                color: white;
-            }
-        </style>
+        <link rel="icon" type="image/png" href="{url_for('static', filename='logo.png')}">
+        <title>Test Vocacional - ITSJC</title>
+        {estilos()}
     </head>
     <body>
-        <div class="d-flex justify-content-center align-items-center min-vh-100 py-5">
-            <div class="card" style="width: 420px;">
-                <div class="card-body px-4 pb-4 pt-4">
-                    <!-- ✅ LOGO DENTRO DEL CUADRO -->
-                    <div class="logo-container">
-                        <img src="/static/logo.png" alt="Logo del Instituto" class="logo">
+        <div class="fondo">
+            <div class="orbe o1"></div>
+            <div class="orbe o2"></div>
+            <div class="orbe o3"></div>
+        </div>
+
+        <button class="tema-btn" id="temaBtn" onclick="alternarTema()">🌙</button>
+
+        <div class="app-container">
+            <div class="logo-wrapper">
+                <img src="{url_for('static', filename='logo.png')}" alt="Logo Instituto" class="logo">
+            </div>
+            
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 2.2rem; font-weight: 900; margin-bottom: 8px;">Test Vocacional</h1>
+                <p style="color: var(--muted); font-size: 1rem;">Descubre qué carrera se adapta mejor a tus intereses y habilidades.</p>
+            </div>
+
+            <div class="card-custom" style="max-width: 500px; margin: 0 auto;">
+                <h3 style="margin-bottom: 20px; font-weight: 800; text-align: center;">¡Comencemos!</h3>
+                <form method="POST" action="/iniciar_test">
+                    <div class="field">
+                        <label class="form-label">👤 Nombre completo</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Escribe tu nombre" required>
                     </div>
-                    <h1 class="text-center mb-2" style="color: #0f2027; font-weight: 700;">Test Vocacional</h1>
-                    <p class="text-center text-muted mb-4">Descubre tu carrera ideal</p>
-                    <form method="POST" action="/iniciar_test">
-                        <div class="mb-3">
-                            <label class="form-label">👤 Nombre completo</label>
-                            <input type="text" name="nombre" class="form-control" placeholder="Tu nombre" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">✉️ Correo electrónico</label>
-                            <input type="email" name="email" class="form-control" placeholder="correo@ejemplo.com" required>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label">🎂 Edad</label>
-                            <input type="number" name="edad" class="form-control" min="14" max="100" placeholder="Tu edad" required>
-                        </div>
-                        <button type="submit" class="btn btn-custom w-100">🚀 Comenzar Test</button>
-                    </form>
+                    <div class="field">
+                        <label class="form-label">✉️ Correo electrónico</label>
+                        <input type="email" name="email" class="form-control" placeholder="ejemplo@correo.com" required>
+                    </div>
+                    <div class="field" style="margin-bottom: 24px;">
+                        <label class="form-label">🎂 Edad</label>
+                        <input type="number" name="edad" class="form-control" min="14" max="100" placeholder="Tu edad" required>
+                    </div>
+                    <button type="submit" class="btn-main">Comenzar test 🚀</button>
+                </form>
+                
+                <a href="/dashboard" class="btn-secondary-custom">📊 Ver estadísticas del test</a>
+            </div>
+        </div>
+
+        {mascota_html()}
+        {scripts()}
+    </body>
+    </html>
+    """
+
+
+@app.route("/dashboard")
+def dashboard():
+    total_usuarios = Usuario.query.count()
+
+    areas = AreaVocacional.query.all()
+    
+    # Contar únicamente el área ganadora (mayor porcentaje) por cada usuario
+    conteo_area_principal = defaultdict(int)
+    for u in Usuario.query.all():
+        mejor_resultado = Resultado.query.filter_by(usuario_id=u.id).order_by(Resultado.porcentaje.desc()).first()
+        if mejor_resultado:
+            conteo_area_principal[mejor_resultado.area_id] += 1
+
+    estadisticas_areas = []
+    for area in areas:
+        cuenta = conteo_area_principal[area.id]
+        datos_a = tema_area(area.id)
+        estadisticas_areas.append((area, cuenta, datos_a))
+
+    # Obtener lista de usuarios recientes con sus resultados principales
+    usuarios_recientes = Usuario.query.order_by(Usuario.created_at.desc()).limit(10).all()
+    registros_tabla = []
+    for u in usuarios_recientes:
+        mejor_res = Resultado.query.filter_by(usuario_id=u.id).order_by(Resultado.porcentaje.desc()).first()
+        carrera_nombre = "Sin definir"
+        if mejor_res:
+            carrera_obj = Carrera.query.filter_by(area_id=mejor_res.area_id).first()
+            if carrera_obj:
+                carrera_nombre = carrera_obj.nombre
+            else:
+                area_obj = db.session.get(AreaVocacional, mejor_res.area_id)
+                carrera_nombre = area_obj.nombre if area_obj else "Área General"
+        
+        registros_tabla.append((u, carrera_nombre, mejor_res.porcentaje if mejor_res else 0))
+
+    areas_html = ""
+    for area, cuenta, d in estadisticas_areas:
+        areas_html += f"""
+        <div style="background: var(--card); border: 1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h5 style="margin: 0; font-weight: 700;">{d['icono']} {escape(area.nombre)}</h5>
+                <p style="margin: 4px 0 0 0; color: var(--muted); font-size: 0.85rem;">{escape(area.descripcion or '')}</p>
+            </div>
+            <div style="font-size: 1.4rem; font-weight: 900; background: rgba(99,102,241,0.1); padding: 8px 16px; border-radius: 12px; color: var(--primary);">
+                {cuenta} <span style="font-size: 0.8rem; font-weight: 600; color: var(--muted);">tests</span>
+            </div>
+        </div>
+        """
+
+    tabla_usuarios_html = ""
+    for u, carr, porc in registros_tabla:
+        tabla_usuarios_html += f"""
+        <tr>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border);">{escape(u.nombre)}</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); color: var(--muted);">{escape(u.email)}</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); font-weight: 600;">{escape(carr)}</td>
+            <td style="padding: 12px; border-bottom: 1px solid var(--border); text-align: right; font-weight: 700; color: var(--primary);">{porc:.1f}%</td>
+        </tr>
+        """
+
+    if not tabla_usuarios_html:
+        tabla_usuarios_html = """
+        <tr>
+            <td colspan="4" style="padding: 20px; text-align: center; color: var(--muted);">Aún no hay registros de estudiantes en el sistema.</td>
+        </tr>
+        """
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" type="image/png" href="{url_for('static', filename='logo.png')}">
+        <title>Dashboard Estadístico - ITSJC</title>
+        {estilos()}
+    </head>
+    <body>
+        <div class="fondo">
+            <div class="orbe o1"></div>
+            <div class="orbe o2"></div>
+            <div class="orbe o3"></div>
+        </div>
+
+        <button class="tema-btn" id="temaBtn" onclick="alternarTema()">🌙</button>
+
+        <div class="app-container" style="max-width: 900px;">
+            <div class="logo-wrapper">
+                <img src="{url_for('static', filename='logo.png')}" alt="Logo Instituto" class="logo" style="width: 90px; height: 90px;">
+            </div>
+
+            <div class="card-custom" style="margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 24px;">
+                    <div>
+                        <h1 style="font-size: 1.8rem; font-weight: 900; margin: 0;">📊 Panel de Estadísticas (Dashboard)</h1>
+                        <p style="color: var(--muted); margin: 4px 0 0 0;">Resumen general de la plataforma del ITSJC</p>
+                    </div>
+                    <a href="/" class="btn-main" style="width: auto; padding: 10px 20px; min-height: 40px; font-size: 0.9rem;">⬅️ Volver al Inicio</a>
+                </div>
+
+                <!-- Tarjeta única de Estudiantes Registrados (ancho completo) -->
+                <div style="background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 28px;">
+                    <div style="font-size: 2.5rem; font-weight: 900; color: var(--primary);">{total_usuarios}</div>
+                    <div style="color: var(--muted); font-weight: 600; font-size: 1rem; margin-top: 4px;">Estudiantes Registrados</div>
+                </div>
+
+                <h3 style="font-weight: 800; font-size: 1.2rem; margin-bottom: 16px;">🎯 Popularidad por Área Vocacional</h3>
+                <div style="margin-bottom: 28px;">
+                    {areas_html}
+                </div>
+
+                <h3 style="font-weight: 800; font-size: 1.2rem; margin-bottom: 16px;">🕒 Últimos Estudiantes Evaluados</h3>
+                <div style="overflow-x: auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 10px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--border);">Nombre</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--border);">Correo</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--border);">Carrera Sugerida</th>
+                                <th style="padding: 12px; border-bottom: 2px solid var(--border); text-align: right;">Afinidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tabla_usuarios_html}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
+
+        {mascota_html()}
+        {scripts()}
     </body>
     </html>
     """
@@ -196,6 +635,7 @@ def test():
         return "Error: Pregunta no encontrada.", 404
 
     progreso = ((pregunta_actual + 1) / len(preguntas_ids)) * 100
+    datos_area = tema_area(pregunta.area_id)
 
     return f"""
     <!DOCTYPE html>
@@ -203,107 +643,52 @@ def test():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" type="image/png" href="{url_for('static', filename='logo.png')}">
         <title>Pregunta {pregunta_actual + 1}</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{
-                background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-                min-height: 100vh;
-                font-family: 'Segoe UI', Roboto, sans-serif;
-                padding: 30px 15px;
-            }}
-            .logo-small {{ text-align: center; margin-bottom: 15px; }}
-            .logo-small img {{ max-width: 140px; }}
-            .card {{
-                border-radius: 20px;
-                box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-                border: none;
-                overflow: hidden;
-            }}
-            .card-body {{ padding: 30px; }}
-            .progress {{
-                height: 28px;
-                border-radius: 14px;
-                background-color: #e9ecef;
-                overflow: hidden;
-                margin-bottom: 25px;
-            }}
-            .progress-bar {{
-                background: linear-gradient(90deg, #007bff, #00c6ff);
-                font-weight: 600;
-            }}
-            .pregunta-texto {{
-                font-size: 1.25rem;
-                color: #1a1a2e;
-                font-weight: 600;
-                line-height: 1.5;
-                margin-bottom: 30px;
-            }}
-            .form-check-input {{ width: 20px; height: 20px; margin-top: 6px; cursor: pointer; }}
-            .form-check-label {{ font-size: 1.05rem; color: #2c3e50; padding-left: 8px; cursor: pointer; }}
-            .opcion {{
-                background: #f8f9fa;
-                border-radius: 12px;
-                padding: 12px 15px;
-                margin-bottom: 10px;
-                transition: background 0.2s ease;
-            }}
-            .opcion:hover {{ background: #e3f2fd; }}
-            .btn-siguiente {{
-                background: linear-gradient(90deg, #007bff, #00c6ff);
-                color: white;
-                font-weight: 600;
-                border-radius: 12px;
-                padding: 12px;
-                border: none;
-                transition: transform 0.2s ease;
-            }}
-            .btn-siguiente:hover {{ transform: translateY(-2px); color: white; }}
-        </style>
+        {estilos()}
     </head>
     <body>
-        <div class="container" style="max-width: 700px;">
-            <div class="card">
-                <div class="card-body">
-                    <!-- ✅ LOGO DENTRO DEL CUADRO BLANCO -->
-                    <div class="logo-small">
-                        <img src="/static/logo.png" alt="Logo Instituto">
-                    </div>
+        <div class="fondo">
+            <div class="orbe o1"></div>
+            <div class="orbe o2"></div>
+            <div class="orbe o3"></div>
+        </div>
 
-                    <h4 class="mb-3 text-center" style="color: #0f2027; font-weight: 700;">Pregunta {pregunta_actual + 1} de {len(preguntas_ids)}</h4>
-                    <div class="progress">
-                        <div class="progress-bar" style="width: {progreso:.1f}%">
-                            {progreso:.0f}%
-                        </div>
-                    </div>
-                    <p class="pregunta-texto">{escape(pregunta.texto)}</p>
-                    <form method="POST" action="/responder">
-                        <input type="hidden" name="pregunta_id" value="{pregunta.id}">
-                        <div class="opcion">
-                            <input class="form-check-input" type="radio" name="puntuacion" value="1" id="r1" required>
-                            <label class="form-check-label" for="r1"> Nunca</label>
-                        </div>
-                        <div class="opcion">
-                            <input class="form-check-input" type="radio" name="puntuacion" value="2" id="r2">
-                            <label class="form-check-label" for="r2"> No</label>
-                        </div>
-                        <div class="opcion">
-                            <input class="form-check-input" type="radio" name="puntuacion" value="3" id="r3">
-                            <label class="form-check-label" for="r3"> A veces</label>
-                        </div>
-                        <div class="opcion">
-                            <input class="form-check-input" type="radio" name="puntuacion" value="4" id="r4">
-                            <label class="form-check-label" for="r4"> Si</label>
-                        </div>
-                        <div class="opcion">
-                            <input class="form-check-input" type="radio" name="puntuacion" value="5" id="r5">
-                            <label class="form-check-label" for="r5"> Siempre</label>
-                        </div>
-                        <button type="submit" class="btn btn-siguiente w-100 mt-4">Siguiente Pregunta ➡️</button>
-                    </form>
+        <button class="tema-btn" id="temaBtn" onclick="alternarTema()">🌙</button>
+
+        <div class="app-container" style="max-width: 700px;">
+            <div class="logo-wrapper">
+                <img src="{url_for('static', filename='logo.png')}" alt="Logo Instituto" class="logo" style="width: 100px; height: 100px;">
+            </div>
+
+            <div class="card-custom">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--muted); font-weight: 600; font-size: .9rem;">
+                    <span>Pregunta {pregunta_actual + 1} de {len(preguntas_ids)}</span>
+                    <span>{progreso:.0f}%</span>
                 </div>
+                <div style="width: 100%; height: 10px; background: rgba(148,163,184,0.2); border-radius: 10px; margin-bottom: 24px; overflow: hidden;">
+                    <div style="width: {progreso}%; height: 100%; background: linear-gradient(90deg, #6366f1, #ec4899);"></div>
+                </div>
+
+                <div class="question">
+                    <span class="icono-area">{datos_area['icono']}</span> {escape(pregunta.texto)}
+                </div>
+
+                <form method="POST" action="/responder">
+                    <input type="hidden" name="pregunta_id" value="{pregunta.id}">
+                    <label class="option"><input type="radio" name="puntuacion" value="1" required> Nunca</label>
+                    <label class="option"><input type="radio" name="puntuacion" value="2"> No</label>
+                    <label class="option"><input type="radio" name="puntuacion" value="3"> A veces</label>
+                    <label class="option"><input type="radio" name="puntuacion" value="4"> Sí</label>
+                    <label class="option"><input type="radio" name="puntuacion" value="5"> Siempre</label>
+                    
+                    <button type="submit" class="btn-main" style="margin-top: 24px;">Siguiente Pregunta ➡️</button>
+                </form>
             </div>
         </div>
+
+        {mascota_html()}
+        {scripts()}
     </body>
     </html>
     """
@@ -322,10 +707,7 @@ def responder():
     try:
         puntuacion = int(puntuacion_str)
     except ValueError:
-        return "Valor de puntuación inválido.", 400
-
-    if puntuacion not in range(1, 6):
-        return "Puntuación fuera del rango permitido (1-5).", 400
+        return "Valor inválido.", 400
 
     respuestas = session.get("respuestas", {})
     respuestas[pregunta_id] = puntuacion
@@ -343,9 +725,6 @@ def procesar_resultados():
         nombre = session.get("nombre", "").strip()
         email = session.get("email", "").strip()
         edad = session.get("edad", 0)
-
-        if not nombre or not email or edad <= 0:
-            return "Faltan datos del usuario. Vuelve a iniciar el test.", 400
 
         usuario = Usuario(nombre=nombre, email=email, edad=edad)
         db.session.add(usuario)
@@ -384,125 +763,58 @@ def procesar_resultados():
     nombre_carrera_rec = carreras_rec[0].nombre if carreras_rec else area_rec.nombre
     desc_carrera_rec = carreras_rec[0].descripcion if carreras_rec else area_rec.descripcion
 
-    todas_areas_html = ""
-    posicion_emoji = ["🥇", "🥈", "🥉", "🏅"]
-    for idx, (area, porc, carreras) in enumerate(resultados):
-        emoji = posicion_emoji[idx] if idx < 4 else "🔹"
-        lista_carreras = ", ".join([c.nombre for c in carreras]) if carreras else "Sin carreras registradas"
-        todas_areas_html += f"""
-        <div style="background:#f8f9fa; border-radius:12px; padding:15px; margin-bottom:10px;">
-            <h6 class="mb-2">{emoji} <strong>{escape(area.nombre)}</strong> — {porc:.1f}%</h6>
-            <p class="mb-0 text-muted small">{escape(lista_carreras)}</p>
-        </div>
-        """
-
-    resultados_html = f"""
+    return f"""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" type="image/png" href="{url_for('static', filename='logo.png')}">
         <title>Resultados del Test Vocacional</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{
-                background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-                min-height: 100vh;
-                font-family: 'Segoe UI', Roboto, sans-serif;
-                padding: 30px 15px;
-            }}
-            .logo-small {{ text-align: center; margin-bottom: 10px; }}
-            .logo-small img {{ max-width: 140px; }}
-            .card {{
-                border-radius: 20px;
-                box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-                border: none;
-                overflow: hidden;
-            }}
-            .header-result {{
-                background: linear-gradient(90deg, #007bff, #00c6ff);
-                color: white;
-                padding: 20px;
-                text-align: center;
-            }}
-            .recomendada {{
-                background: linear-gradient(90deg, #ff6b35, #f7931e);
-                color: white;
-                padding: 35px 25px;
-                border-radius: 16px;
-                text-align: center;
-                margin: 30px 20px;
-                box-shadow: 0 8px 25px rgba(255,107,53,0.35);
-            }}
-            .porcentaje-box {{
-                background: rgba(255,255,255,0.25);
-                display: inline-block;
-                padding: 10px 25px;
-                border-radius: 30px;
-                margin-top: 15px;
-                font-size: 1.3rem;
-                font-weight: 700;
-            }}
-            .descripcion-carrera {{
-                background: #f8f9fa;
-                border-radius: 14px;
-                padding: 25px;
-                margin: 0 20px 30px 20px;
-                text-align: center;
-            }}
-            .otras-areas {{
-                margin: 0 20px 30px 20px;
-            }}
-            .btn-reiniciar {{
-                background: linear-gradient(90deg, #28a745, #20c997);
-                color: white;
-                font-weight: 600;
-                border-radius: 12px;
-                padding: 12px 30px;
-                border: none;
-            }}
-            .btn-reiniciar:hover {{ color: white; }}
-        </style>
+        {estilos()}
     </head>
     <body>
-        <div class="container" style="max-width: 600px;">
-            <div class="card">
-                <!-- ✅ LOGO DENTRO DEL CUADRO CELESTE -->
-                <div class="header-result">
-                    <div class="logo-small">
-                        <img src="/static/logo.png" alt="Logo Instituto">
-                    </div>
-                    <h2 class="mb-0">🎓 Resultados del Test Vocacional</h2>
-                    <p class="mb-0 mt-1 fs-5">— {escape(usuario.nombre)} —</p>
+        <div class="fondo">
+            <div class="orbe o1"></div>
+            <div class="orbe o2"></div>
+            <div class="orbe o3"></div>
+        </div>
+
+        <button class="tema-btn" id="temaBtn" onclick="alternarTema()">🌙</button>
+
+        <div class="app-container" style="max-width: 650px;">
+            <div class="logo-wrapper">
+                <img src="{url_for('static', filename='logo.png')}" alt="Logo Instituto" class="logo" style="width: 100px; height: 100px;">
+            </div>
+
+            <div class="card-custom" style="text-align: center;">
+                <div style="font-size: 3.5rem; margin-bottom: 10px;">🏆</div>
+                <h1 style="font-size: 1.8rem; font-weight: 900; margin-bottom: 6px;">¡Resultados del Test!</h1>
+                <p style="color: var(--muted); font-size: 1.1rem; margin-bottom: 24px;">{escape(usuario.nombre)}</p>
+
+                <div style="background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff; padding: 28px; border-radius: 20px; margin-bottom: 24px; box-shadow: 0 12px 30px rgba(99,102,241,0.3);">
+                    <h4 style="font-weight: 600; margin-bottom: 8px; font-size: 1rem; opacity: 0.9;">Tu carrera recomendada:</h4>
+                    <h2 style="font-size: 2rem; font-weight: 900; margin-bottom: 12px;">{escape(nombre_carrera_rec)}</h2>
+                    <span style="background: rgba(255,255,255,0.25); padding: 6px 18px; border-radius: 20px; font-weight: 800; font-size: 1.2rem;">{porc_rec:.1f}% de afinidad</span>
                 </div>
 
-                <div class="card-body px-0 py-4">
-                    <div class="recomendada">
-                        <h4 class="mb-3">🏆 Tu Carrera Recomendada:</h4>
-                        <h2 class="display-5 fw-bold">{escape(nombre_carrera_rec)}</h2>
-                        <div class="porcentaje-box">{porc_rec:.1f}%</div>
-                    </div>
+                <div style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align: left; margin-bottom: 24px;">
+                    <h5 style="font-weight: 700; margin-bottom: 8px;">¿En qué consiste?</h5>
+                    <p style="color: var(--muted); margin: 0; line-height: 1.6;">{escape(desc_carrera_rec or "")}</p>
+                </div>
 
-                    <div class="descripcion-carrera">
-                        <h5 class="fw-bold text-muted mb-3">¿En qué consiste?</h5>
-                        <p class="fs-6">{escape(desc_carrera_rec or "")}</p>
-                    </div>
-
-                    <div class="otras-areas">
-                        <h5 class="fw-bold text-center mb-3 text-muted">📋 Todas tus áreas</h5>
-                        {todas_areas_html}
-                    </div>
-
-                    <div class="text-center mt-3 mb-4">
-                        <a href="/reiniciar" class="btn btn-reiniciar">🔄 Realizar nuevo test</a>
-                    </div>
+                <div style="display: flex; gap: 10px; flex-direction: column;">
+                    <a href="/reiniciar" class="btn-main" style="text-decoration: none;">🔄 Realizar nuevo test</a>
+                    <a href="/dashboard" class="btn-secondary-custom">📊 Ver estadísticas del test</a>
                 </div>
             </div>
         </div>
+
+        {mascota_html()}
+        {scripts()}
     </body>
     </html>
     """
-    return resultados_html
 
 
 @app.route("/reiniciar")
@@ -515,41 +827,24 @@ def init_db():
     with app.app_context():
         try:
             db.create_all()
-            print("✅ Tablas creadas.")
+            print("✅ Tablas creadas correctamente.")
             if AreaVocacional.query.first():
-                print("ℹ️ Datos existentes detectados, se omite carga inicial.")
                 return
 
             areas = [
-                AreaVocacional(nombre="Informática y Sistemas", descripcion="Aprenderás a programar, crear aplicaciones, manejar bases de datos y administrar redes. Desarrollarás soluciones usando tecnología."),
-                AreaVocacional(nombre="Industria Alimentaria", descripcion="Aprenderás a elaborar, conservar y controlar la calidad de los alimentos. Conocerás cómo transformar materias primas en productos seguros."),
-                AreaVocacional(nombre="Mecánica Automotriz", descripcion="Aprenderás a diagnosticar, reparar y dar mantenimiento a motores y vehículos. Trabajarás con herramientas y piezas mecánicas."),
-                AreaVocacional(nombre="Electromecánica", descripcion="Aprenderás a instalar y mantener sistemas eléctricos, máquinas y equipos industriales. Combinarás electricidad con mecánica.")
+                AreaVocacional(nombre="Informática y Sistemas", descripcion="Aprenderás a programar, crear aplicaciones, manejar bases de datos y administrar redes."),
+                AreaVocacional(nombre="Industria Alimentaria", descripcion="Aprenderás a elaborar, conservar y controlar la calidad de los alimentos."),
+                AreaVocacional(nombre="Mecánica Automotriz", descripcion="Aprenderás a diagnosticar, reparar y dar mantenimiento a motores y vehículos."),
+                AreaVocacional(nombre="Electromecánica", descripcion="Aprenderás a instalar y mantener sistemas eléctricos, máquinas y equipos industriales.")
             ]
             db.session.add_all(areas)
             db.session.commit()
 
             carreras = [
-                Carrera(
-                    nombre="Sistemas Informáticos",
-                    descripcion="Aprenderás a programar, crear aplicaciones, manejar bases de datos y administrar redes. Desarrollarás soluciones usando tecnología.",
-                    area_id=1
-                ),
-                Carrera(
-                    nombre="Industria de Alimentos",
-                    descripcion="Aprenderás a elaborar, conservar y controlar la calidad de los alimentos. Conocerás cómo transformar materias primas en productos seguros.",
-                    area_id=2
-                ),
-                Carrera(
-                    nombre="Mecánica Automotriz",
-                    descripcion="Aprenderás a diagnosticar, reparar y dar mantenimiento a motores y vehículos. Trabajarás con herramientas y piezas mecánicas.",
-                    area_id=3
-                ),
-                Carrera(
-                    nombre="Electromecánica",
-                    descripcion="Aprenderás a instalar y mantener sistemas eléctricos, máquinas y equipos industriales. Combinarás electricidad con mecánica.",
-                    area_id=4
-                ),
+                Carrera(nombre="Sistemas Informáticos", descripcion="Desarrollo de software, bases de datos y redes informáticas.", area_id=1),
+                Carrera(nombre="Industria de Alimentos", descripcion="Transformación y control de calidad de productos alimentarios.", area_id=2),
+                Carrera(nombre="Mecánica Automotriz", descripcion="Reparación de motores, sistemas de transmisión y vehículos modernos.", area_id=3),
+                Carrera(nombre="Electromecánica", descripcion="Automatización industrial y sistemas eléctricos combinados con mecánica.", area_id=4),
             ]
             db.session.add_all(carreras)
             db.session.commit()
@@ -560,36 +855,28 @@ def init_db():
                 Pregunta(texto="Me interesa crear o programar mis propias herramientas digitales", area_id=1),
                 Pregunta(texto="Prefiero resolver problemas usando la lógica y herramientas informáticas", area_id=1),
                 Pregunta(texto="Me atrae el mundo de internet, los sistemas y el tratamiento de información", area_id=1),
-                Pregunta(texto="Me imagino creando aplicaciones que ayuden a las personas", area_id=1),
-                Pregunta(texto="Siento curiosidad por saber cómo se protege la información en internet", area_id=1),
                 Pregunta(texto="Me interesa saber cómo se elaboran y conservan los alimentos", area_id=2),
                 Pregunta(texto="Me llama la atención el proceso de transformación de materias primas en productos", area_id=2),
-                Pregunta(texto="Me gustaría trabajar controlando la calidad y seguridad de los alimentos", area_id=2),
+                Pregunta(texto="Me gustaría trabalhar controlando la calidad y seguridad de los alimentos", area_id=2),
                 Pregunta(texto="Tengo curiosidad por conocer los procesos químicos y biológicos de los alimentos", area_id=2),
                 Pregunta(texto="Me interesa la parte técnica de producción y procesamiento industrial", area_id=2),
-                Pregunta(texto="Me atrae investigar cómo mejorar el valor nutricional de los alimentos", area_id=2),
-                Pregunta(texto="Me gustaría innovar en nuevas formas de envasar y conservar productos", area_id=2),
                 Pregunta(texto="Me gusta desarmar y armar objetos para entender cómo funcionan", area_id=3),
                 Pregunta(texto="Siento curiosidad por saber cómo funcionan los motores y los vehículos", area_id=3),
                 Pregunta(texto="Prefiero trabajar con herramientas, piezas y máquinas físicas", area_id=3),
                 Pregunta(texto="Me atrae diagnosticar fallas y reparar equipos y automóviles", area_id=3),
                 Pregunta(texto="Me interesa aprender el funcionamiento de cada parte de un vehículo", area_id=3),
-                Pregunta(texto="Me gustaría conocer cómo se diseñan y fabrican los vehículos modernos", area_id=3),
-                Pregunta(texto="Disfruto al ver cómo una máquina cobra vida al armarla correctamente", area_id=3),
                 Pregunta(texto="Me interesa cómo funcionan la electricidad y los circuitos", area_id=4),
                 Pregunta(texto="Disfruto entendiendo cómo se combinan sistemas eléctricos y mecánicos", area_id=4),
                 Pregunta(texto="Me gustaría instalar y mantener equipos eléctricos e industriales", area_id=4),
                 Pregunta(texto="Siento interés por las máquinas eléctricas, controles y automatización", area_id=4),
                 Pregunta(texto="Me atrae trabajar con instalaciones, energía y tecnología industrial", area_id=4),
-                Pregunta(texto="Me llama la atención saber cómo funciona la maquinaria de una fábrica", area_id=4),
-                Pregunta(texto="Me imagino controlando procesos automáticos usando electricidad", area_id=4),
             ]
             db.session.add_all(preguntas)
             db.session.commit()
-            print("✅ Datos cargados.")
+            print("✅ Datos iniciales cargados con éxito.")
         except Exception as error:
             db.session.rollback()
-            print(f"❌ Error: {error}")
+            print(f"❌ Error en base de datos: {error}")
 
 
 if __name__ == "__main__":
